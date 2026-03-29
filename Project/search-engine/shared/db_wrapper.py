@@ -35,6 +35,13 @@ class DatabaseWrapper:
                 mtime=excluded.mtime,
                 preview=excluded.preview
         """, (path, extension, size, mtime, preview))
+
+        row_id = cursor.lastrowid
+        cursor.execute("""
+            INSERT INTO files_fts (rowid, path, preview)
+            VALUES (?, ?, ?)
+        """, (row_id, path, preview))
+
         self._conn.commit()
 
     def get_mtime(self, path: str) -> float | None:
@@ -45,13 +52,27 @@ class DatabaseWrapper:
 
     def search(self, query: str) -> list[dict]:
         cursor = self._conn.cursor()
+
+        try:
+            cursor.execute("""
+                SELECT f.path, f.extension, f.preview
+                FROM files_fts
+                JOIN files f ON files_fts.rowid = f.id
+                WHERE files_fts MATCH ?
+                LIMIT 20
+            """, (query,))
+            rows = cursor.fetchall()
+            if rows:
+                return [{"path": r[0], "extension": r[1], "preview": r[2]} for r in rows]
+        except Exception as e:
+            print(f"[FTS ERROR] {e}")
+
         cursor.execute("""
-            SELECT f.path, f.extension, f.preview
-            FROM files_fts
-            JOIN files f ON files_fts.rowid = f.id
-            WHERE files_fts MATCH ?
+            SELECT path, extension, preview
+            FROM files
+            WHERE path LIKE ?
             LIMIT 20
-        """, (query,))
+        """, (f"%{query}%",))
         rows = cursor.fetchall()
         return [{"path": r[0], "extension": r[1], "preview": r[2]} for r in rows]
 
