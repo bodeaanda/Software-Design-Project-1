@@ -77,7 +77,7 @@ class DatabaseWrapper:
 
         where_clause = " AND ".join(conditions)
         query = f"""
-            SELECT f.path, f.extension, f.preview, f.score
+            SELECT f.path, f.extension, f.preview, f.score, f.mtime
             FROM files f
             WHERE {where_clause}
             ORDER BY f.score DESC
@@ -85,7 +85,7 @@ class DatabaseWrapper:
         """
         cursor.execute(query, params)
         rows = cursor.fetchall()
-        return [{"path": r[0], "extension": r[1], "preview": r[2], "score": r[3]} for r in rows]
+        return [{"path": r[0], "extension": r[1], "preview": r[2], "score": r[3], "mtime": r[4]} for r in rows]
 
     def close(self):
         self._conn.close()

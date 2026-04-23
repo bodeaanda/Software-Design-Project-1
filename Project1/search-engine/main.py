@@ -8,6 +8,7 @@ from indexer.progress_reporter import ProgressReporter
 from search.query_parser import QueryParser
 from search.result_controller import ResultController
 from search.preview_formatter import PreviewFormatter
+from search.ranking_strategy import ScoreRanking, AlphabeticalRanking, DateRanking
 
 config = AppConfig.load()
 db = DatabaseWrapper(config)
@@ -28,6 +29,15 @@ reporter.report()
 parser = QueryParser()
 controller = ResultController(db, parser)
 formatter = PreviewFormatter()
+
+print("Available Ranking: 1=Score, 2=Alphabetical, 3=Date")
+ranking_choice = input("Choose ranking: ").strip()
+if ranking_choice == "2":
+    controller.set_ranking(AlphabeticalRanking())
+elif ranking_choice == "3":
+    controller.set_ranking(DateRanking())
+else:
+    controller.set_ranking(ScoreRanking())
 
 print("Search ready. Type a query or 'quit' to exit.")
 while True:
