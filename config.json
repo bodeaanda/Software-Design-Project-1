@@ -1,0 +1,7 @@
+{
+    "root_dir": "C:\\Users\\Anda\\Documents",
+    "ignore_dirs": [".git", ".venv", "node_modules", "__pycache__"],
+    "ignore_extensions": [".exe", ".dll", ".bin", ".zip", ".png", ".jpg", ".mp4"],
+    "db_path": "search_engine.db",
+    "report_format": "text"
+}

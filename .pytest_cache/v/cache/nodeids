@@ -1,0 +1,10 @@
+[
+  "tests/test_query_parser.py::test_combined_qualifiers",
+  "tests/test_query_parser.py::test_content_qualifier",
+  "tests/test_query_parser.py::test_general_term",
+  "tests/test_query_parser.py::test_multiple_path_terms",
+  "tests/test_query_parser.py::test_path_qualifier",
+  "tests/test_ranking_strategy.py::test_alphabetical_ranking",
+  "tests/test_ranking_strategy.py::test_date_ranking",
+  "tests/test_ranking_strategy.py::test_score_ranking"
+]
