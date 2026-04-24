@@ -1,3 +1,4 @@
+from importlib.resources import path
 from pathlib import Path
 
 class MetadataExtractor:
@@ -19,7 +20,10 @@ class MetadataExtractor:
                 for i, line in enumerate(f):
                     if i >= 3:
                         break
-                    lines.append(line.strip())
+                    stripped = line.strip()
+                    if len(stripped) > 100:
+                        stripped = stripped[:100] + "..."
+                    lines.append(stripped)
             return " | ".join(lines)
         except Exception:
             return ""

@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 class FileScorer:
@@ -24,7 +25,6 @@ class FileScorer:
         total_score += self.PRIORITY_EXTENSIONS.get(ext, 0)
 
         # recent files 
-        import time
         age_days = (time.time() - mtime) / 86400
         if age_days < 7:
             total_score += 1.0

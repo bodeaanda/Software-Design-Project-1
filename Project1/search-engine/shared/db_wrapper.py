@@ -1,7 +1,5 @@
 import sqlite3
-
-from fastapi import params
-
+import time
 from shared.app_config import AppConfig
 
 class DatabaseWrapper:
@@ -25,6 +23,12 @@ class DatabaseWrapper:
 
             CREATE VIRTUAL TABLE IF NOT EXISTS files_fts
             USING fts5(path, preview, content='files', content_rowid='id');
+
+            CREATE TABLE IF NOT EXISTS search_history (
+                id        INTEGER PRIMARY KEY,
+                query     TEXT NOT NULL,
+                timestamp REAL NOT NULL
+            );
         """)
         self._conn.commit()
 
@@ -86,6 +90,26 @@ class DatabaseWrapper:
         cursor.execute(query, params)
         rows = cursor.fetchall()
         return [{"path": r[0], "extension": r[1], "preview": r[2], "score": r[3], "mtime": r[4]} for r in rows]
+
+    def save_search(self, query: str):
+        cursor = self._conn.cursor()
+        cursor.execute("""
+            INSERT INTO search_history (query, timestamp)
+            VALUES (?, ?)
+        """, (query, time.time()))
+        self._conn.commit()
+
+    def get_suggestions(self, prefix: str) -> list[str]:
+        cursor = self._conn.cursor()
+        cursor.execute("""
+            SELECT query, COUNT(*) as freq
+            FROM search_history
+            WHERE query LIKE ?
+            GROUP BY query
+            ORDER BY freq DESC
+            LIMIT 5
+        """, (f"{prefix}%",))
+        return [row[0] for row in cursor.fetchall()]
 
     def close(self):
         self._conn.close()
