@@ -1,5 +1,7 @@
 import sqlite3
 import time
+
+from shared.levenshtein import levenshtein_distance, similarity_score
 from shared.app_config import AppConfig
 
 class DatabaseWrapper:
@@ -89,7 +91,14 @@ class DatabaseWrapper:
         """
         cursor.execute(query, params)
         rows = cursor.fetchall()
-        return [{"path": r[0], "extension": r[1], "preview": r[2], "score": r[3], "mtime": r[4]} for r in rows]
+        results = [{"path": r[0], "extension": r[1], "preview": r[2], "score": r[3], "mtime": r[4]} for r in rows]
+
+        # Only try typo search if we have general terms and no results found
+        if not results and parsed.get("general"):
+            print("[TYPO] No exact results, trying typo search...")
+            results = self.typo_search(parsed.get("general", []))
+
+        return results
 
     def save_search(self, query: str):
         cursor = self._conn.cursor()
@@ -110,6 +119,54 @@ class DatabaseWrapper:
             LIMIT 5
         """, (f"{prefix}%",))
         return [row[0] for row in cursor.fetchall()]
+
+    def typo_search(self, query_terms: list[str], threshold: float = 0.5) -> list[dict]:
+        from shared.levenshtein import similarity_score
+
+        cursor = self._conn.cursor()
+        cursor.execute("""
+            SELECT path, extension, preview, score, mtime
+            FROM files
+        """)
+        all_files = cursor.fetchall()
+
+        results = []
+        for row in all_files:
+            path = row[0]
+            filename = path.split("\\")[-1]
+            preview = row[2] if row[2] else ""
+
+            best_score = 0.0
+            matched_term = None
+            
+            for term in query_terms:
+                # Check similarity against filename
+                filename_score = similarity_score(term, filename)
+                # Check similarity against preview (search in words)
+                preview_score = 0.0
+                for word in preview.split():
+                    word_score = similarity_score(term, word)
+                    if word_score > preview_score:
+                        preview_score = word_score
+                
+                # Take the best match between filename and preview
+                current_best = max(filename_score, preview_score)
+                if current_best > best_score:
+                    best_score = current_best
+                    matched_term = term
+
+            if best_score >= threshold:
+                results.append({
+                    "path": row[0],
+                    "extension": row[1],
+                    "preview": row[2],
+                    "score": row[3],
+                    "mtime": row[4],
+                    "similarity": round(best_score, 2)
+                })
+
+        results.sort(key=lambda r: (r["similarity"], r["score"]), reverse=True)
+        return results[:20]
 
     def close(self):
         self._conn.close()
