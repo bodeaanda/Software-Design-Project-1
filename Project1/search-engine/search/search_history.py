@@ -5,6 +5,7 @@ class SearchHistory(SearchObserver):
     def __init__(self, db: DatabaseWrapper):
         self._db = db
 
+    #calls whenever search happens
     def on_search(self, query: str):
         self._db.save_search(query)
 

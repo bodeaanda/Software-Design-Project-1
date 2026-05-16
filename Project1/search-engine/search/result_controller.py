@@ -10,12 +10,15 @@ class ResultController:
         self._ranking = ranking or ScoreRanking()
         self._observers: list[SearchObserver] = []
 
+    #replaces the current ranking strategy
     def set_ranking(self, ranking: RankingStrategy):
         self._ranking = ranking
 
+    #obs get notified whenever a search runs
     def add_observer(self, observer: SearchObserver):
         self._observers.append(observer)
 
+    #calls on_search 
     def _notify_observers(self, query: str):
         for observer in self._observers:
             observer.on_search(query)
