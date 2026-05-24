@@ -3,6 +3,7 @@ from tkinter import ttk
 from search.result_controller import ResultController
 from search.search_history import SearchHistory
 from search.ranking_strategy import ScoreRanking, AlphabeticalRanking, DateRanking
+from search.widgets import WidgetManager
 
 BG_DARK = "#1a1a2e"
 BG_MEDIUM = "#16213e"
@@ -14,9 +15,10 @@ C_GRAY = "#7D7C84"
 C_ORANGE = "#DE8F6E"
 
 class SearchGUI:
-    def __init__(self, controller: ResultController, history: SearchHistory):
+    def __init__(self, controller: ResultController, history: SearchHistory, widget_manager: WidgetManager):
         self._controller = controller
         self._history = history
+        self._widget_manager = widget_manager
 
         self._window = tk.Tk()
         self._window.title("Local Search Engine")
@@ -80,6 +82,10 @@ class SearchGUI:
                               font=("Georgia", 10),
                               bg=BG_DARK, fg=C_GRAY)
         count_label.pack(anchor=tk.W, padx=20)
+
+        # action widgets for context-aware suggestions
+        self._widget_frame = tk.Frame(self._window, bg=BG_DARK)
+        self._widget_frame.pack(fill=tk.X, padx=20, pady=(5, 0))
 
         # results list
         results_frame = tk.Frame(self._window, bg=BG_DARK)
@@ -150,11 +156,49 @@ class SearchGUI:
             self._results_list.insert(tk.END, f"   Last Modified: {date_str}\n\n", "date")
 
         self._results_list.config(state=tk.DISABLED)
+        self._update_widgets(results)
+
+    def _update_widgets(self, results: list[dict]):
+        for child in self._widget_frame.winfo_children():
+            child.destroy()
+
+        active_widgets = self._widget_manager.get_active_widgets()
+        print(f"[GUI] _update_widgets -> found {len(active_widgets)} active widgets")
+        if not active_widgets:
+            return
+
+        context = self._widget_manager.get_context()
+        if not context:
+            return
+
+        label = tk.Label(self._widget_frame,
+                         text="Suggested actions:",
+                         font=("Georgia", 10, "bold"),
+                         bg=BG_DARK,
+                         fg=C_YELLOW)
+        label.pack(anchor=tk.W)
+
+        try:
+            names = ", ".join([w.name for w in active_widgets])
+            debug_label = tk.Label(self._widget_frame, text=f"Active: {names}", font=("Georgia", 9), bg=BG_DARK, fg=C_GRAY)
+            debug_label.pack(anchor=tk.W)
+        except Exception:
+            pass
+
+        action_frame = tk.Frame(self._widget_frame, bg=BG_DARK)
+        action_frame.pack(anchor=tk.W, pady=(5, 0))
+
+        for widget in active_widgets:
+            button = widget.build_button(action_frame, context)
+            button.pack(side=tk.LEFT, padx=5)
 
     def _clear_results(self):
         self._results_list.config(state=tk.NORMAL)
         self._results_list.delete(1.0, tk.END)
         self._results_list.config(state=tk.DISABLED)
+
+        for child in self._widget_frame.winfo_children():
+            child.destroy()
 
     def run(self):
         self._window.mainloop()

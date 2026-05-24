@@ -28,7 +28,9 @@ class IndexManager:
                 size=metadata["size"],
                 mtime=metadata["mtime"],
                 preview=metadata["preview"],
-                score=score
+                score=score,
+                dominant_color=metadata["dominant_color"],
+                file_type=metadata["file_type"]
             )
             self._reporter.increment_indexed()
         except Exception as e:

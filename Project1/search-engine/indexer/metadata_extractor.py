@@ -1,29 +1,38 @@
-from importlib.resources import path
 from pathlib import Path
+from indexer.file_processor import FileProcessor, TextFileProcessor, ImageFileProcessor
 
 class MetadataExtractor:
+    def __init__(self):
+        self._processors: list[FileProcessor] = [
+            TextFileProcessor(),
+            ImageFileProcessor(),
+        ]
+
     def extract(self, path: Path) -> dict:
         stat = path.stat()
-        preview = self._get_preview(path)
+        processor = self._get_processor(path)
+
+        try:
+            result = processor.process(path)
+        except Exception:
+            result = {
+                "type": "unknown",
+                "preview": "",
+                "dominant_color": None
+            }
+
         return {
             "path": str(path),
             "extension": path.suffix.lower(),
             "size": stat.st_size,
             "mtime": stat.st_mtime,
-            "preview": preview
+            "preview": result.get("preview", ""),
+            "dominant_color": result.get("dominant_color", None),
+            "file_type": result.get("type", "text")
         }
 
-    def _get_preview(self, path: Path) -> str:
-        try:
-            with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                lines = []
-                for i, line in enumerate(f):
-                    if i >= 3:
-                        break
-                    stripped = line.strip()
-                    if len(stripped) > 100:
-                        stripped = stripped[:100] + "..."
-                    lines.append(stripped)
-            return " | ".join(lines)
-        except Exception:
-            return ""
+    def _get_processor(self, path: Path) -> FileProcessor:
+        for processor in self._processors:
+            if processor.can_process(path):
+                return processor
+        return TextFileProcessor()

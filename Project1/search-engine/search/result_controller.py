@@ -19,18 +19,19 @@ class ResultController:
         self._observers.append(observer)
 
     #calls on_search 
-    def _notify_observers(self, query: str):
+    def _notify_observers(self, query: str, results: list[dict]):
         for observer in self._observers:
-            observer.on_search(query)
+            observer.on_search(query, results)
 
     def search(self, raw_query: str) -> list[dict]:
         parsed = self._parser.parse(raw_query)
         if not parsed:
             return []
         try:
-            self._notify_observers(raw_query)
             results = self._db.search(parsed)
-            return self._ranking.rank(results)
+            ranked = self._ranking.rank(results)
+            self._notify_observers(raw_query, ranked)
+            return ranked
         except Exception as e:
             print(f"[ERROR] Search failed: {e}")
             return []

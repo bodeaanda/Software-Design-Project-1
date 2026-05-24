@@ -14,14 +14,16 @@ class DatabaseWrapper:
         cursor = self._conn.cursor()
         cursor.executescript("""
             CREATE TABLE IF NOT EXISTS files (
-                id        INTEGER PRIMARY KEY,
-                path      TEXT UNIQUE NOT NULL,
-                extension TEXT,
-                size      INTEGER,
-                mtime     REAL,
-                preview   TEXT,
-                score     REAL DEFAULT 0.0
-            );
+                id             INTEGER PRIMARY KEY,
+                path           TEXT UNIQUE NOT NULL,
+                extension      TEXT,
+                size           INTEGER,
+                mtime          REAL,
+                preview        TEXT,
+                score          REAL DEFAULT 0.0,
+                dominant_color TEXT,
+                file_type      TEXT DEFAULT 'text'
+        );
 
             CREATE VIRTUAL TABLE IF NOT EXISTS files_fts
             USING fts5(path, preview, content='files', content_rowid='id');
@@ -34,18 +36,20 @@ class DatabaseWrapper:
         """)
         self._conn.commit()
 
-    def upsert_file(self, path, extension, size, mtime, preview, score=0.0):
+    def upsert_file(self, path, extension, size, mtime, preview, score=0.0, dominant_color=None, file_type="text"):
         cursor = self._conn.cursor()
         cursor.execute("""
-            INSERT INTO files (path, extension, size, mtime, preview, score)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO files (path, extension, size, mtime, preview, score, dominant_color, file_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(path) DO UPDATE SET
                 extension=excluded.extension,
                 size=excluded.size,
                 mtime=excluded.mtime,
                 preview=excluded.preview,
-                score=excluded.score
-        """, (path, extension, size, mtime, preview, score))
+                score=excluded.score,
+                dominant_color=excluded.dominant_color,
+                file_type=excluded.file_type
+        """, (path, extension, size, mtime, preview, score, dominant_color, file_type))
 
         row_id = cursor.lastrowid
         cursor.execute("""
@@ -78,12 +82,16 @@ class DatabaseWrapper:
             conditions.append("(f.path LIKE ? OR f.preview LIKE ?)")
             params.extend([f"%{term}%", f"%{term}%"])
 
+        for term in parsed.get("color", []):
+            conditions.append("f.dominant_color = ?")
+            params.append(term.lower())
+
         if not conditions:
             return []
 
         where_clause = " AND ".join(conditions)
         query = f"""
-            SELECT f.path, f.extension, f.preview, f.score, f.mtime
+            SELECT f.path, f.extension, f.preview, f.score, f.mtime, f.dominant_color, f.file_type
             FROM files f
             WHERE {where_clause}
             ORDER BY f.score DESC
@@ -91,11 +99,14 @@ class DatabaseWrapper:
         """
         cursor.execute(query, params)
         rows = cursor.fetchall()
-        results = [{"path": r[0], "extension": r[1], "preview": r[2], "score": r[3], "mtime": r[4]} for r in rows]
-        
-        if not results and parsed.get("general"):
-            print("[TYPO] No exact results, trying typo search...")
-            results = self.typo_search(parsed.get("general", []))
+        results = [{"path": r[0], "extension": r[1], "preview": r[2], "score": r[3], 
+                "mtime": r[4], "dominant_color": r[5], "file_type": r[6]} for r in rows]
+
+        if not results:
+            all_terms = parsed.get("general", []) + parsed.get("path", []) + parsed.get("content", [])
+            if all_terms:
+                print("[TYPO] No exact results, trying typo search...")
+                results = self.typo_search(all_terms)
 
         return results
 

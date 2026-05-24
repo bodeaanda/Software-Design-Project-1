@@ -9,6 +9,7 @@ from search.query_parser import QueryParser
 from search.result_controller import ResultController
 from search.ranking_strategy import ScoreRanking, AlphabeticalRanking, DateRanking
 from search.search_history import SearchHistory
+from search.widgets import WidgetManager
 from search.gui import SearchGUI
 
 config = AppConfig.load()
@@ -33,7 +34,10 @@ controller = ResultController(db, parser)
 history = SearchHistory(db)
 controller.add_observer(history)
 
-gui = SearchGUI(controller, history)
+widget_manager = WidgetManager()
+controller.add_observer(widget_manager)
+
+gui = SearchGUI(controller, history, widget_manager)
 gui.run()
 
 db.close()

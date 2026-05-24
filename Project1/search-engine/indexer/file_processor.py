@@ -76,12 +76,10 @@ class ImageFileProcessor(FileProcessor):
         try:
             from PIL import Image
             img = Image.open(path).convert("RGB")
-            img = img.resize((50, 50))  # resize for speed
+            img = img.resize((50, 50))  
 
-            # count all pixels
             pixels = list(img.getdata())
             
-            # average RGB
             r = sum(p[0] for p in pixels) // len(pixels)
             g = sum(p[1] for p in pixels) // len(pixels)
             b = sum(p[2] for p in pixels) // len(pixels)
@@ -91,12 +89,11 @@ class ImageFileProcessor(FileProcessor):
             return "unknown"
 
     def _rgb_to_color_name(self, r: int, g: int, b: int) -> str:
-        # find dominant channel
+    
         max_val = max(r, g, b)
         min_val = min(r, g, b)
         diff = max_val - min_val
 
-        # grayscale check
         if diff < 30:
             if max_val > 200:
                 return "white"
@@ -104,8 +101,7 @@ class ImageFileProcessor(FileProcessor):
                 return "black"
             else:
                 return "gray"
-
-        # dominant channel
+            
         if r == max_val and r > g + 30 and r > b + 30:
             if g > 150:
                 return "yellow"
