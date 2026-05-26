@@ -4,6 +4,7 @@ from indexer.file_scanner import FileScanner
 from indexer.file_filter import FileFilter
 from indexer.metadata_extractor import MetadataExtractor
 from indexer.index_manager import IndexManager
+from indexer.parallel_indexer import ParallelIndexer
 from indexer.progress_reporter import ProgressReporter
 from search.query_parser import QueryParser
 from search.result_controller import ResultController
@@ -22,9 +23,9 @@ extractor = MetadataExtractor()
 index_manager = IndexManager(db, extractor, reporter)
 
 reporter.start()
-for path in scanner.scan():
-    if file_filter.should_index(path):
-        index_manager.process(path)
+all_paths = [p for p in scanner.scan() if file_filter.should_index(p)]
+parallel_indexer = ParallelIndexer(db, extractor, reporter, num_readers=4)
+parallel_indexer.index_all(all_paths)
 print("Done!")
 reporter.report()
 

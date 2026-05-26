@@ -1,5 +1,6 @@
 import sqlite3
 import time
+import threading
 
 from shared.levenshtein import levenshtein_distance, similarity_score
 from shared.app_config import AppConfig
@@ -7,7 +8,8 @@ from shared.app_config import AppConfig
 class DatabaseWrapper:
     def __init__(self, config: AppConfig):
         self._db_path = config.db_path
-        self._conn = sqlite3.connect(self._db_path)
+        self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        self._lock = threading.Lock()
         self._create_schema()
 
     def _create_schema(self):
@@ -37,33 +39,35 @@ class DatabaseWrapper:
         self._conn.commit()
 
     def upsert_file(self, path, extension, size, mtime, preview, score=0.0, dominant_color=None, file_type="text"):
-        cursor = self._conn.cursor()
-        cursor.execute("""
-            INSERT INTO files (path, extension, size, mtime, preview, score, dominant_color, file_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(path) DO UPDATE SET
-                extension=excluded.extension,
-                size=excluded.size,
-                mtime=excluded.mtime,
-                preview=excluded.preview,
-                score=excluded.score,
-                dominant_color=excluded.dominant_color,
-                file_type=excluded.file_type
-        """, (path, extension, size, mtime, preview, score, dominant_color, file_type))
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute("""
+                INSERT INTO files (path, extension, size, mtime, preview, score, dominant_color, file_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(path) DO UPDATE SET
+                    extension=excluded.extension,
+                    size=excluded.size,
+                    mtime=excluded.mtime,
+                    preview=excluded.preview,
+                    score=excluded.score,
+                    dominant_color=excluded.dominant_color,
+                    file_type=excluded.file_type
+            """, (path, extension, size, mtime, preview, score, dominant_color, file_type))
 
-        row_id = cursor.lastrowid
-        cursor.execute("""
-            INSERT INTO files_fts (rowid, path, preview)
-            VALUES (?, ?, ?)
-        """, (row_id, path, preview))
+            row_id = cursor.lastrowid
+            cursor.execute("""
+                INSERT INTO files_fts (rowid, path, preview)
+                VALUES (?, ?, ?)
+            """, (row_id, path, preview))
 
-        self._conn.commit()
+            self._conn.commit()
 
     def get_mtime(self, path: str) -> float | None:
-        cursor = self._conn.cursor()
-        cursor.execute("SELECT mtime FROM files WHERE path = ?", (path,))
-        row = cursor.fetchone()
-        return row[0] if row else None
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute("SELECT mtime FROM files WHERE path = ?", (path,))
+            row = cursor.fetchone()
+            return row[0] if row else None
 
     def search(self, parsed: dict) -> list[dict]:
         cursor = self._conn.cursor()
@@ -71,16 +75,19 @@ class DatabaseWrapper:
         params = []
 
         for term in parsed.get("path", []):
+            clean = term.rstrip("*")
             conditions.append("f.path LIKE ?")
-            params.append(f"%{term}%")
+            params.append(f"%{clean}%")
 
         for term in parsed.get("content", []):
+            clean = term.rstrip("*")
             conditions.append("f.preview LIKE ?")
-            params.append(f"%{term}%")
+            params.append(f"%{clean}%")
 
         for term in parsed.get("general", []):
+            clean = term.rstrip("*")
             conditions.append("(f.path LIKE ? OR f.preview LIKE ?)")
-            params.extend([f"%{term}%", f"%{term}%"])
+            params.extend([f"%{clean}%", f"%{clean}%"])
 
         for term in parsed.get("color", []):
             conditions.append("f.dominant_color = ?")
@@ -135,7 +142,7 @@ class DatabaseWrapper:
 
         cursor = self._conn.cursor()
         cursor.execute("""
-            SELECT path, extension, preview, score, mtime
+            SELECT path, extension, preview, score, mtime, dominant_color, file_type
             FROM files
         """)
         all_files = cursor.fetchall()
@@ -172,7 +179,9 @@ class DatabaseWrapper:
                     "preview": row[2],
                     "score": row[3],
                     "mtime": row[4],
-                    "similarity": round(best_score, 2)
+                    "similarity": round(best_score, 2),
+                    "dominant_color": row[5],
+                    "file_type": row[6],
                 })
 
         results.sort(key=lambda r: (r["similarity"], r["score"]), reverse=True)
