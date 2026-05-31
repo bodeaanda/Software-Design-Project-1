@@ -163,7 +163,6 @@ class SearchGUI:
             child.destroy()
 
         active_widgets = self._widget_manager.get_active_widgets()
-        print(f"[GUI] _update_widgets -> found {len(active_widgets)} active widgets")
         if not active_widgets:
             return
 

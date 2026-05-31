@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from search.observer import SearchObserver
 
-DEBUG_WIDGETS = True
+DEBUG_WIDGETS = False
 
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'}
 LOG_EXTENSIONS = {'.log'}
@@ -64,7 +64,7 @@ class ContextAwareWidget(ABC):
 
 class AnalyzeLogsWidget(ContextAwareWidget):
     name = "Analyze Logs"
-    description = "Summarize log results and highlight entries of interest."
+    description = "Summarize log results."
 
     def can_activate(self, context: SearchContext) -> bool:
         logs = context.log_results()

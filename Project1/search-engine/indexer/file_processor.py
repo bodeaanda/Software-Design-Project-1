@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
+from sys import path
 
 class FileProcessor(ABC):
  
@@ -68,7 +69,7 @@ class ImageFileProcessor(FileProcessor):
         color = self._extract_dominant_color(path)
         return {
             "type": "image",
-            "preview": f"[Image] dominant color: {color}",
+            "preview": f"Dominant color: {color}",
             "dominant_color": color
         }
 
@@ -85,7 +86,8 @@ class ImageFileProcessor(FileProcessor):
             b = sum(p[2] for p in pixels) // len(pixels)
 
             return self._rgb_to_color_name(r, g, b)
-        except Exception:
+        except Exception as e:
+            print(f"[IMAGE ERROR] {path}: {e}")
             return "unknown"
 
     def _rgb_to_color_name(self, r: int, g: int, b: int) -> str:

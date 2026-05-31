@@ -112,7 +112,7 @@ class DatabaseWrapper:
         if not results:
             all_terms = parsed.get("general", []) + parsed.get("path", []) + parsed.get("content", [])
             if all_terms:
-                print("[TYPO] No exact results, trying typo search...")
+                #print("[TYPO] No exact results, trying typo search...")
                 results = self.typo_search(all_terms)
 
         return results

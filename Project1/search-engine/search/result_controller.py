@@ -24,7 +24,6 @@ class ResultController:
 
     def search(self, raw_query: str) -> list[dict]:
         processed_query = self._preprocessor.build(raw_query)
-        print(f"[PREPROCESSOR] '{raw_query}' -> '{processed_query}'")
 
         parsed = self._parser.parse(processed_query)
         if not parsed:
