@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from sys import path
+
 
 class FileProcessor(ABC):
- 
+
     @abstractmethod
     def can_process(self, path: Path) -> bool:
         pass
@@ -15,7 +15,7 @@ class FileProcessor(ABC):
 
 class TextFileProcessor(FileProcessor):
 
-    TEXT_EXTENSIONS = {'.txt', '.py', '.java', '.md', '.json', '.xml', 
+    TEXT_EXTENSIONS = {'.txt', '.py', '.java', '.md', '.json', '.xml',
                        '.csv', '.html', '.css', '.js', '.ino', '.c', '.cpp'}
 
     def can_process(self, path: Path) -> bool:
@@ -46,21 +46,8 @@ class TextFileProcessor(FileProcessor):
 
 
 class ImageFileProcessor(FileProcessor):
-    
+
     IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.webp'}
-    COLOR_MAP = [
-        ("red",    (200, 0,   0),   (255, 80,  80)),
-        ("green",  (0,   150, 0),   (80,  255, 80)),
-        ("blue",   (0,   0,   150), (80,  80,  255)),
-        ("yellow", (200, 200, 0),   (255, 255, 80)),
-        ("orange", (200, 100, 0),   (255, 180, 80)),
-        ("purple", (100, 0,   150), (180, 80,  255)),
-        ("pink",   (200, 0,   150), (255, 80,  200)),
-        ("brown",  (100, 50,  0),   (180, 120, 80)),
-        ("white",  (200, 200, 200), (255, 255, 255)),
-        ("black",  (0,   0,   0),   (80,  80,  80)),
-        ("gray",   (80,  80,  80),  (200, 200, 200)),
-    ]
 
     def can_process(self, path: Path) -> bool:
         return path.suffix.lower() in self.IMAGE_EXTENSIONS
@@ -69,29 +56,41 @@ class ImageFileProcessor(FileProcessor):
         color = self._extract_dominant_color(path)
         return {
             "type": "image",
-            "preview": f"Dominant color: {color}",
+            "preview": f"[Image] dominant color: {color}",
             "dominant_color": color
         }
 
     def _extract_dominant_color(self, path: Path) -> str:
         try:
             from PIL import Image
-            img = Image.open(path).convert("RGB")
-            img = img.resize((50, 50))  
+            from collections import Counter
 
+            img = Image.open(path).convert("RGBA")
+            img = img.resize((50, 50))
             pixels = list(img.getdata())
-            
-            r = sum(p[0] for p in pixels) // len(pixels)
-            g = sum(p[1] for p in pixels) // len(pixels)
-            b = sum(p[2] for p in pixels) // len(pixels)
 
-            return self._rgb_to_color_name(r, g, b)
+            # ignora pixelii transparenti (alpha < 30)
+            visible = [(r, g, b) for r, g, b, a in pixels if a > 30]
+            if not visible:
+                visible = [(r, g, b) for r, g, b, a in pixels]
+
+            # cuantizeaza la 8 nivele pentru a grupa culorile similare
+            quantized = [(r // 32 * 32, g // 32 * 32, b // 32 * 32) for r, g, b in visible]
+            most_common = Counter(quantized).most_common(5)
+
+            # voteaza culoarea dominanta dintre top 5
+            votes: Counter = Counter()
+            for (r, g, b), count in most_common:
+                color = self._rgb_to_color_name(r, g, b)
+                votes[color] += count
+
+            return votes.most_common(1)[0][0]
+
         except Exception as e:
             print(f"[IMAGE ERROR] {path}: {e}")
             return "unknown"
 
     def _rgb_to_color_name(self, r: int, g: int, b: int) -> str:
-    
         max_val = max(r, g, b)
         min_val = min(r, g, b)
         diff = max_val - min_val
@@ -103,7 +102,7 @@ class ImageFileProcessor(FileProcessor):
                 return "black"
             else:
                 return "gray"
-            
+
         if r == max_val and r > g + 30 and r > b + 30:
             if g > 150:
                 return "yellow"
