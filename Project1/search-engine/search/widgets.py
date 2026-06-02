@@ -70,10 +70,8 @@ class AnalyzeLogsWidget(ContextAwareWidget):
         logs = context.log_results()
         if len(logs) < 2:
             return False
-
         if len(logs) >= max(1, context.result_count // 3):
             return True
-
         keywords = ("log", "logs", "error", "exception", "warn", "warning", "trace", "stacktrace")
         return any(term in context.normalized_query for term in keywords)
 
@@ -116,16 +114,16 @@ class ViewGalleryWidget(ContextAwareWidget):
         images = context.image_results()
         if len(images) < 3:
             return False
-
         if len(images) >= max(1, context.result_count // 2):
             return True
-
         keywords = ("image", "images", "photo", "photos", "gallery", "jpg", "jpeg", "png", "gif", "bmp", "webp")
         return any(term in context.normalized_query for term in keywords)
 
     def activate(self, parent, context: SearchContext):
         import tkinter as tk
         from tkinter import messagebox
+        from PIL import Image, ImageTk
+
         images = context.image_results()
         if not images:
             messagebox.showinfo("View as Gallery", "No image results available.")
@@ -133,24 +131,58 @@ class ViewGalleryWidget(ContextAwareWidget):
 
         window = tk.Toplevel(parent)
         window.title("Gallery View")
-        window.geometry("700x350")
+        window.geometry("800x500")
         window.configure(bg="#16213e")
 
-        title = tk.Label(window, text=f"Image Gallery ({len(images)} images)", font=("Georgia", 14, "bold"), bg="#16213e", fg="#DBD56E")
+        title = tk.Label(window, text=f"Image Gallery ({len(images)} images)",
+                         font=("Georgia", 14, "bold"), bg="#16213e", fg="#DBD56E")
         title.pack(pady=10)
 
-        gallery_frame = tk.Frame(window, bg="#16213e")
-        gallery_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        container = tk.Frame(window, bg="#16213e")
+        container.pack(fill=tk.BOTH, expand=True)
 
-        image_list = tk.Listbox(gallery_frame, bg="#0f3460", fg="#88AB75", font=("Georgia", 10), selectbackground="#1a1a2e", bd=0)
-        image_list.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
+        canvas = tk.Canvas(container, bg="#16213e", highlightthickness=0)
+        scrollbar = tk.Scrollbar(container, orient=tk.VERTICAL, command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
 
-        scrollbar = tk.Scrollbar(gallery_frame, command=image_list.yview)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        image_list.config(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        for image in images:
-            image_list.insert(tk.END, image.get("path", "Unknown"))
+        inner_frame = tk.Frame(canvas, bg="#16213e")
+        canvas_window = canvas.create_window((0, 0), window=inner_frame, anchor="nw")
+
+        self._photo_refs = []
+        COLS = 4
+        THUMB_SIZE = (160, 120)
+
+        for idx, img_data in enumerate(images[:40]):
+            path = img_data.get("path", "")
+            row, col = divmod(idx, COLS)
+
+            cell = tk.Frame(inner_frame, bg="#0f3460", padx=4, pady=4)
+            cell.grid(row=row, column=col, padx=6, pady=6)
+
+            try:
+                img = Image.open(path)
+                img.thumbnail(THUMB_SIZE)
+                photo = ImageTk.PhotoImage(img)
+                self._photo_refs.append(photo)
+
+                lbl_img = tk.Label(cell, image=photo, bg="#0f3460")
+                lbl_img.pack()
+            except Exception:
+                lbl_img = tk.Label(cell, text="?", width=14, height=6,
+                                   bg="#1a1a2e", fg="#DBD56E", font=("Georgia", 20))
+                lbl_img.pack()
+
+            fname = path.split("\\")[-1].split("/")[-1]
+            lbl_name = tk.Label(cell, text=fname[:20], bg="#0f3460", fg="#88AB75",
+                                font=("Georgia", 8), wraplength=160)
+            lbl_name.pack()
+
+        inner_frame.update_idletasks()
+        canvas.configure(scrollregion=canvas.bbox("all"))
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(canvas_window, width=e.width))
 
     def __repr__(self):
         return f"{self.name}({self.description})"
